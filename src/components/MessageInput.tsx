@@ -14,7 +14,10 @@ export function MessageInput() {
     e.preventDefault();
     
     const trimmedMessage = message.trim();
-    if (!trimmedMessage) return;
+    if (!trimmedMessage) {
+      toast.error("Please enter a message");
+      return;
+    }
     
     if (!currentChatId) {
       toast.error("No chat selected");

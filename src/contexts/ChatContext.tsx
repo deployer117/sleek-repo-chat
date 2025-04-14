@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface ChatContextType {
   chats: Chat[];
   currentChatId: string | null;
+  currentChat: Chat | null;
   setCurrentChatId: (id: string | null) => void;
   createNewChat: (repoUrl?: string) => void;
   addMessage: (content: string, role: "user" | "assistant") => void;
@@ -20,6 +21,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Get current chat from chats array
+  const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
   // Load chats from localStorage on mount
   useEffect(() => {
@@ -68,6 +72,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (repoUrl) {
       setIsLoading(true);
       // Simulate a delay to represent processing the repo
+      toast.loading("Processing repository...");
+      
       setTimeout(() => {
         const initialMessage: Message = {
           id: generateId(),
@@ -88,6 +94,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           )
         );
         setIsLoading(false);
+        toast.success("Repository processed successfully!");
       }, 1500);
     }
   };
@@ -125,6 +132,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       
       try {
         // In a real app, this would be an API call to your agent
+        toast.loading("Processing your request...");
+        
         // Simulating a delay to represent API call
         await new Promise((resolve) => setTimeout(resolve, 1500));
         
@@ -146,6 +155,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               : chat
           )
         );
+        
+        toast.success("Response received");
       } catch (error) {
         toast.error("Failed to get a response");
         console.error("Error getting assistant response:", error);
@@ -162,6 +173,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     if (currentChatId === id) {
       const remainingChats = chats.filter((chat) => chat.id !== id);
       setCurrentChatId(remainingChats.length > 0 ? remainingChats[0].id : null);
+      toast.info("Chat deleted");
     }
   };
 
@@ -170,6 +182,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       value={{
         chats,
         currentChatId,
+        currentChat,
         setCurrentChatId,
         createNewChat,
         addMessage,
