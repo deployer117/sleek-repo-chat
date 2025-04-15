@@ -1,31 +1,99 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, LogOut, User, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [name, setName] = useState("John Doe");
-  const [email, setEmail] = useState("john@example.com");
+  const [isFetching, setIsFetching] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+        
+        if (!data.session) {
+          navigate("/signin");
+          return;
+        }
+        
+        // Set current user info
+        const user = data.session.user;
+        setUserId(user.id);
+        setEmail(user.email || "");
+        
+        // Fetch profile data
+        await fetchProfile(user.id);
+      } catch (error) {
+        console.error("Error checking session:", error);
+        navigate("/signin");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
+  
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setUsername(data.username || "");
+        setFullName(data.full_name || "");
+        setAvatarUrl(data.avatar_url || "");
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!userId) {
+      toast.error("You must be logged in to update your profile");
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase
-      // For now just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username,
+          full_name: fullName,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+      
+      if (error) throw error;
       
       toast.success("Profile updated successfully!");
-    } catch (error) {
-      toast.error("Error updating profile");
+    } catch (error: any) {
+      toast.error(error.message || "Error updating profile");
       console.error("Profile update error:", error);
     } finally {
       setIsLoading(false);
@@ -36,19 +104,27 @@ const Profile = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase
-      // For now just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
       
       toast.success("Signed out successfully!");
       navigate("/signin");
-    } catch (error) {
-      toast.error("Error signing out");
+    } catch (error: any) {
+      toast.error(error.message || "Error signing out");
       console.error("Sign out error:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isFetching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col p-6 bg-background">
@@ -63,10 +139,16 @@ const Profile = () => {
           <div className="md:w-1/3">
             <div className="bg-card/50 backdrop-blur-sm p-6 rounded-lg border border-border shadow-sm sticky top-6">
               <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <User className="h-12 w-12 text-primary" />
-                </div>
-                <h2 className="text-xl font-bold">{name}</h2>
+                <Avatar className="w-24 h-24 mb-4">
+                  {avatarUrl ? (
+                    <AvatarImage src={avatarUrl} alt={fullName || username} />
+                  ) : (
+                    <AvatarFallback className="text-xl">
+                      {(fullName || username || email)?.charAt(0)?.toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <h2 className="text-xl font-bold">{fullName || username || "User"}</h2>
                 <p className="text-sm text-muted-foreground">{email}</p>
               </div>
               
@@ -100,11 +182,22 @@ const Profile = () => {
               
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input 
-                    id="name" 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)}
+                    id="username" 
+                    value={username} 
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Choose a username"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input 
+                    id="fullName" 
+                    value={fullName} 
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Your full name"
                   />
                 </div>
                 
@@ -114,7 +207,6 @@ const Profile = () => {
                     id="email" 
                     type="email" 
                     value={email} 
-                    onChange={(e) => setEmail(e.target.value)}
                     disabled
                   />
                   <p className="text-xs text-muted-foreground">Email cannot be changed</p>

@@ -1,17 +1,30 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Github, Loader2, LogIn } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const SignIn = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate("/app");
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,14 +38,17 @@ const SignIn = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase
-      // For now just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
       
       toast.success("Signed in successfully!");
-      navigate("/");
-    } catch (error) {
-      toast.error("Error signing in. Please try again.");
+      navigate("/app");
+    } catch (error: any) {
+      toast.error(error.message || "Error signing in. Please try again.");
       console.error("Sign in error:", error);
     } finally {
       setIsLoading(false);
@@ -43,15 +59,19 @@ const SignIn = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase with GitHub
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/app`,
+        },
+      });
       
-      toast.success("Signed in with GitHub!");
-      navigate("/");
-    } catch (error) {
-      toast.error("Error signing in with GitHub");
+      if (error) throw error;
+      
+      // No toast needed as we're redirecting to GitHub
+    } catch (error: any) {
+      toast.error(error.message || "Error signing in with GitHub");
       console.error("GitHub sign in error:", error);
-    } finally {
       setIsLoading(false);
     }
   };

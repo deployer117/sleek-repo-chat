@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const ForgotPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,14 +24,16 @@ const ForgotPassword = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase
-      // For now just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/signin`,
+      });
+      
+      if (error) throw error;
       
       setSubmitted(true);
       toast.success("Password reset link sent to your email");
-    } catch (error) {
-      toast.error("Error sending reset link");
+    } catch (error: any) {
+      toast.error(error.message || "Error sending reset link");
       console.error("Password reset error:", error);
     } finally {
       setIsLoading(false);

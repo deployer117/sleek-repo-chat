@@ -1,25 +1,39 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Github, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const navigate = useNavigate();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate("/app");
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form
     if (!email || !password || !confirmPassword) {
-      toast.error("Please fill in all fields");
+      toast.error("Please fill in all required fields");
       return;
     }
     
@@ -36,14 +50,23 @@ const SignUp = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase
-      // For now just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+          emailRedirectTo: `${window.location.origin}/app`,
+        },
+      });
       
-      toast.success("Account created successfully!");
-      navigate("/");
-    } catch (error) {
-      toast.error("Error creating account");
+      if (error) throw error;
+      
+      toast.success("Account created successfully! Please check your email for verification.");
+      navigate("/signin");
+    } catch (error: any) {
+      toast.error(error.message || "Error creating account");
       console.error("Sign up error:", error);
     } finally {
       setIsLoading(false);
@@ -54,15 +77,19 @@ const SignUp = () => {
     setIsLoading(true);
     
     try {
-      // This is where you would connect to Supabase with GitHub
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/app`,
+        },
+      });
       
-      toast.success("Signed up with GitHub!");
-      navigate("/");
-    } catch (error) {
-      toast.error("Error signing up with GitHub");
+      if (error) throw error;
+      
+      // No toast needed as we're redirecting to GitHub
+    } catch (error: any) {
+      toast.error(error.message || "Error signing up with GitHub");
       console.error("GitHub sign up error:", error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -82,6 +109,17 @@ const SignUp = () => {
         
         <div className="bg-card/50 backdrop-blur-sm p-6 rounded-lg border border-border shadow-sm">
           <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name (Optional)</Label>
+              <Input 
+                id="fullName" 
+                type="text" 
+                placeholder="John Doe" 
+                value={fullName} 
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
